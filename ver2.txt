@@ -1,0 +1,244 @@
+cd openstack1docs.openstack.org
+http://docs.openstack.org/mitaka/install-guide-rdo/
+https://etherpad.openstack.org/p/sipa
+http://vasabilab.cs.tu.ac.th/presentations/OpenStack-tutorial-day1-july2015.pdf
+ 
+$ git clone https://github.com/itbakery/training.git
+$ cd openstack1  && vagrant destroy
+$ vagrant status
+$ vagrant ssh controller
+[vagrant@controller ~]$
+ 
+$ ping compute -c 4
+$ sudo su -
+# openssl rand -hex 10
+bf487bc7590bb3e44e32
+# echo "export DB_PASS=bf487bc7590bb3e44e32"  >> password
+ 
+!!!
+Security   NOVA   =>  NOVA_PASS, NOVA_DBPASS
+                CINDER =>  CINDER_PASS, CINDER_DBPASS
+                
+!!! 
+Host network   controller  -> ip a
+
+    eth0   -> Gateway to internet
+
+    eth1 (10.10.10.10) -> management network / api-network
+
+     
+
+!!! 
+DNS  ->  /etc/hosts  (local dns)
+ 
+!!! 
+NTP  ->  time sync -> controller  ------ sync --------- time server 
+
+    list ntp server:        
+
+           server 0.th.pool.ntp.org
+           server 1.asia.pool.ntp.org
+           server 2.asia.pool.ntp.org
+!!!
+install ntp (Chrony)
+ 
+# yum install chrony
+           
+[root@controller ~]# rpm -qa | grep chrony
+chrony-2.1.1-1.el7.centos.x86_64
+[root@controller ~]# rpm -ql chrony-2.1.1-1.el7.centos.x86_64 | grep conf              v
+[root@controller ~]# cp /etc/chrony.conf  /etc/chrony.conf.back 
+[root@controller ~]# vi /etc/chrony.conf
+ 
+           server 0.th.pool.ntp.org  iburst
+           server 1.asia.pool.ntp.org iburst
+           server 2.asia.pool.ntp.org iburst:
+ 
+[root@controller ~]# systemctl start chronyd
+[root@controller ~]# systemctl enable chronyd
+[root@controller ~]# systemctl status chronyd
+ 
+[root@controller ~]# chronyc sources
+210 Number of sources = 4
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^- 124.109.2.169                 3  10   377   392  +1165us[+1165us] +/-   43ms
+^* 122.155.169.213               2  10   377   440    -68us[ -269us] +/- 9224us
+^- 203.146.215.116               2  10   377   649   +656us[ +456us] +/-   21ms
+^- 203.158.247.150               2   9   377   204  +1553us[+1553us] +/-   33ms
+
+!!!
+NTP on Controller
+# yum install chrony
+
+    # vi /etc/chrony.conf
+
+
+    server 10.10.10.10 iburst
+
+
+systemctl restart chronyd
+systemctl enable
+
+chronyc  sources
+
+
+!!!
+Timezone  (controll + compute)
+# timedatectl
+[root@controller ~]# timedatectl list-timezones | grep Bangkok
+
+    Asia/Bangkok
+
+[root@controller ~]# timedatectl 
+yum install centos-release-openstack-mitaka
+      Local time: Mon 2016-09-26 10:50:15 ICT
+  Universal time: Mon 2016-09-26 03:50:15 UTC
+        RTC time: Mon 2016-09-26 03:50:17
+       Time zone: Asia/Bangkok (ICT, +0700)
+     NTP enabled: yes
+NTP synchronized: yes
+ RTC in local TZ: no
+      DST active: n/a
+[root@controller ~]# 
+
+!!!
+SSH passwordless
+1.  gen key
+# ssh-keygen -t rsa -b 4096 -C "mycloud"
+
+Your identification has been saved in /root/.ssh/id_rsa. --> private ls
+Your public key has been saved in /root/.ssh/id_rsa.pub.  --> public --> send to compute
+
+# ssh-add -L
+
+[root@controller ~]# ssh-add -L
+Could not open a connection to your authentication agent.
+[root@controller ~]# eval `ssh-agent -s`
+Agent pid 31925
+[root@controller ~]# ssh-add -L
+The agent has no identities.
+[root@controller ~]# ssh-add
+Identity added: /root/.ssh/id_rsa (/root/.ssh/id_rsa)
+[root@controller ~]# ssh-add -L
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDKiyvsULR/s6fMB+0HNMNcWHwbVS1NoT8R2OtYJa6QzMSh5stCm2taAnqOLALQ0T4GP0eGeYRUQBxyMAwBn4++wXzcpNQhFKH/9I+Je3v0zF6nJr
+...
+A2yolLip5qFum2hwl2mtoBFC/v5qsRDyUqYgWgw3mibXFW9M+rK+/KDFWTir9oZ8gffwLrWpa2W3NJ5/Ls6NOz1tTyCb4emXUyZa3ZEOBOAPital5arzh6EUUnkr/Xdz3UkcG1dEAoVfgATQuQ== /root/.ssh/id_rsa
+
+!!!
+copy key to compute
+[root@controller ~]# ssh-copy-id compute
+The authenticity of host 'compute (10.10.10.11)' can't be established.
+ECDSA key fingerprint is b1:92:b3:f8:69:2a:ee:78:50:88:ec:d4:92:17:05:10.
+Are you sure you want to continue connecting (yes/no)? yes
+/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+root@compute's password: 
+
+Number of key(s) added: 
+
+Now try logging into the machine, with:   "ssh 'compute'"
+and check to make sure that only the key(s) you wanted were added.
+
+
+## Test login to Compute
+[root@controller ~]# ssh compute
+Last login: Mon Sep 26 10:36:23 2016
+[root@compute ~]# cat ~/.ssh/authorized_keys 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDKiyvsULR/s6fMB+0HNMNcWHwbVS1NoT8R2OtYJa6
+...
+A2yolLip5qFum2hwl2mtoBFC/v5qsRDyUqYgWgw3mibXFW9M+rK+/KDFWTir9oZ8gffwLrWpa2W3NJ5/Ls6NOz1tTyCb4emXUyZa3ZEOBOAPital5arzh6EUUnkr/Xdz3UkcG1dEAoVfgATQuQ== /root/.ssh/id_rsa
+
+### Send to self
+[root@controller ~]# ssh-copy-id controller
+
+!!!
+Install openstack package (controller + compute)
+
+# yum install epel-release
+# yum install centos-release-openstack-mitaka
+# yum install openstack-utils
+
+
+Existing lock /var/run/yum.pid: another copy is running as pid 32054.
+rm -rf /var/run/yum.pid
+
+
+!!! 
+Finalize
+# yum upgrade
+# yum install python-openstackclient
+# yum install openstack-selinux
+
+!!! Reboot
+openstack1> vagrant halt
+openstack1> vagrant up
+
+
+!!! Install database
+[root@controller ~]# hostname -s
+[root@controller ~]# yum install mariadb mariadb-server python2-PyMySQL
+
+!!! Rename file
+[root@controller ~]# cd /etc/my.cnf.d/
+[root@controller ~]# mv mariadb-server.cnf openstack.cnf
+
+[root@controller my.cnf.d]# less openstack.cnf 
+[root@controller my.cnf.d]# grep ^[^#] openstack.cnf 
+
+[server]
+[mysqld]
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
+log-error=/var/log/mariadb/mariadb.log
+pid-file=/var/run/mariadb/mariadb.pid
+[galera]
+[embedded]
+[mariadb]
+[mariadb-10.1]
+
+## backup config
+[root@controller my.cnf.d]# cp openstack.cnf /root
+[root@controller my.cnf.d]# vi openstack.cnf
+
+[mysqld]
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
+log-error=/var/log/mariadb/mariadb.log
+pid-file=/var/run/mariadb/mariadb.pid
+bind-address = 10.10.10.10
+default-storage-engine = innodb
+innodb_file_per_table
+max_connections = 4096
+collation-server = utf8_general_ci
+character-set-server = utf8
+
+## Restart Database
+# systemctl enable mariadb.service
+# systemctl start mariadb.service
+# systemctl status mariadb.service  -l
+
+## verify
+[root@controller my.cnf.d]# netstat -tapnu | grep 3306
+tcp        0      0 10.10.10.10:3306        0.0.0.0:*               LISTEN      11823/mysqld
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
